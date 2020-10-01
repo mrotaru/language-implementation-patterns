@@ -1,5 +1,4 @@
 * Langauge Implementation Patterns
-
 ** LL(1) Recursive Descent Lexer
    - the terms "lexer", "tokenizer" and "scanner" are used interchangeably
    - implement a tokenizer for list representations like "[a, b]", "[]", "[a,b,c]", etc
@@ -108,8 +107,6 @@
       assert!(matches!(tokens[5], Token::EOF));
     #+END_SRC
 
-    #+RESULTS: tests
-
 *** Complete Tokenizer
     #+BEGIN_SRC rust :noweb yes :tangle 01-LL1-recursive-descent-parser.rs
       use std::cell::RefCell;
@@ -152,5 +149,41 @@
     #+END_SRC
 
     #+RESULTS:
+    
+** LL(1) Recursive Descent Lexer - Generic (WIP)
+   - above implementation concrete; how would a generic one look ?
+   - the lexing algorithm doesn't really change, so it should be reusable
 
+    #+BEGIN_SRC rust
+      use std::cell::RefCell;
+      struct Lexer {
+          iterator: RefCell<Box<dyn Iterator<Item = char>>>,
+      }
+      impl Lexer {
+          fn new(input: &String) -> ListLexer {
+              let mut iterator = input.chars().peekable();
+              Lexer { iterator: RefCell::new(Box::new(iterator)) }
+          }
+      }
+    #+END_SRC
 
+** LL(1) Recursive Descent Parser
+*** Grammar
+    #+BEGIN_SRC
+      list          : '[' elements ']' ;
+      elements  : element (',' element)* ;
+      element   : NAME | list ;
+    #+END_SRC
+    
+    #+BEGIN_SRC rust
+      struct ListParser {
+          
+      }
+    #+END_SRC
+    
+*** Tests
+    #+BEGIN_SRC rust
+    #+END_SRC
+
+** Resources
+   - practical terminology intro: https://tomassetti.me/guide-parsing-algorithms-terminology/
