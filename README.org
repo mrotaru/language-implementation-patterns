@@ -148,8 +148,6 @@
       <<tests>>
     #+END_SRC
 
-    #+RESULTS:
-    
 ** LL(1) Recursive Descent Lexer - Generic (WIP)
    - above implementation concrete; how would a generic one look ?
    - the lexing algorithm doesn't really change, so it should be reusable
@@ -174,16 +172,173 @@
       elements  : element (',' element)* ;
       element   : NAME | list ;
     #+END_SRC
-    
-    #+BEGIN_SRC rust
-      struct ListParser {
-          
-      }
+
+*** AST Attempt
+      - not sure how to express the above as an AST
+      - more precisely, that an element can be either a list item, or another list
+        - item element: ~[a]~
+        - list element: ~[[a]]~
+    #+BEGIN_SRC nim
+      type NodeKind = enum
+        List,
+        Element,
+        Elements,
+
+      type ElementNodeKind = enum
+        Item,
+        List,
+
+      type NodeRef = ref Node
+      type Node = object
+          case kind: NodeKind # discriminator
+          of List: children: Elements,
+          of Elements: children seq[Element],
+          of Element:
+            case kind: ElementNodeKind
+            of Item: item: string,
+            of List: list: List,
     #+END_SRC
-    
+
+*** Parser that does nothing
+    #+BEGIN_SRC nim
+      import strutils
+
+      type TokenKind = enum
+        Comma,
+        SquareBracketOpen,
+        SquareBracketClose,
+        ListItem,
+        EOF,
+
+      type Token = object
+        kind: TokenKind
+        payload: string
+
+      type Parser = ref object
+        input: seq[Token]
+        input_cursor: int
+        lookahead: Token
+
+      type ParserException = object of Defect
+
+      proc match(this: Parser, token_kind: TokenKind): void =
+        if this.lookahead.kind == token_kind:
+          echo "Matched a '$#'" % [$token_kind, $this.lookahead]
+          if this.input_cursor < len(this.input)-1:
+            this.input_cursor = this.input_cursor + 1
+            this.lookahead = this.input[this.input_cursor]
+        else:
+          let msg = "Expected $#, got $#" % [$token_kind, $this.lookahead.kind]
+          raise ParserException.newException(msg)
+
+      # forward declarations
+      proc elements(this: Parser): void;
+      proc element(this: Parser): void;
+
+      proc list(this: Parser): void =
+        this.match(SquareBracketOpen)
+        this.elements()
+        this.match(SquareBracketClose)
+
+      proc elements(this: Parser): void =
+        this.element()
+        while this.lookahead.kind == Comma:
+          this.match(Comma)
+          this.element()
+
+      proc element(this: Parser): void =
+        if this.lookahead.kind == ListItem:
+          this.match(ListItem)
+        elif this.lookahead.kind == SquareBracketOpen:
+          this.list()
+
+      #proc parse(this: Parser, cb: proc(node: string): void): void =
+      proc parse(this: Parser): void =
+        this.lookahead = this.input[0]
+        this.list()
+
+      # tests
+      echo "testing: [ foo ]"
+      let parser = Parser(input: @[
+        Token(kind: SquareBracketOpen),
+        TOken(kind: ListItem, payload: "foo"),
+        Token(kind: SquareBracketClose),
+      ])
+      parser.parse()
+
+      echo "testing: [ foo, bar ]"
+      let parser2 = Parser(input: @[
+        Token(kind: SquareBracketOpen),
+        TOken(kind: ListItem, payload: "foo"),
+        Token(kind: Comma),
+        TOken(kind: ListItem, payload: "bar"),
+        Token(kind: SquareBracketClose),
+      ])
+      parser2.parse()
+
+      echo "testing: [ [ foo ] ]"
+      let parser3 = Parser(input: @[
+        Token(kind: SquareBracketOpen),
+        Token(kind: SquareBracketOpen),
+        TOken(kind: ListItem, payload: "foo"),
+        Token(kind: SquareBracketClose),
+        Token(kind: SquareBracketClose),
+      ])
+      parser3.parse()
+
+      echo "testing: [ foo, [ bar, baz ] ]"
+      let parser4 = Parser(input: @[
+        Token(kind: SquareBracketOpen),
+        TOken(kind: ListItem, payload: "foo"),
+        Token(kind: Comma),
+        Token(kind: SquareBracketOpen),
+        TOken(kind: ListItem, payload: "bar"),
+        Token(kind: Comma),
+        TOken(kind: ListItem, payload: "baz"),
+        Token(kind: SquareBracketClose),
+        Token(kind: SquareBracketClose),
+      ])
+      parser4.parse()
+  #+END_SRC
+
+  #+RESULTS:
+  #+begin_example
+  testing: [ foo ]
+  Matched a 'SquareBracketOpen'
+  Matched a 'ListItem'
+  Matched a 'SquareBracketClose'
+  testing: [ foo, bar ]
+  Matched a 'SquareBracketOpen'
+  Matched a 'ListItem'
+  Matched a 'Comma'
+  Matched a 'ListItem'
+  Matched a 'SquareBracketClose'
+  testing: [ [ foo ] ]
+  Matched a 'SquareBracketOpen'
+  Matched a 'SquareBracketOpen'
+  Matched a 'ListItem'
+  Matched a 'SquareBracketClose'
+  Matched a 'SquareBracketClose'
+  testing: [ foo, [ bar, baz ] ]
+  Matched a 'SquareBracketOpen'
+  Matched a 'ListItem'
+  Matched a 'Comma'
+  Matched a 'SquareBracketOpen'
+  Matched a 'ListItem'
+  Matched a 'Comma'
+  Matched a 'ListItem'
+  Matched a 'SquareBracketClose'
+  Matched a 'SquareBracketClose'
+  #+end_example
+
 *** Tests
-    #+BEGIN_SRC rust
-    #+END_SRC
+  #+BEGIN_SRC nim
+  #+END_SRC
 
 ** Resources
    - practical terminology intro: https://tomassetti.me/guide-parsing-algorithms-terminology/
+   - [[https://www.youtube.com/watch?v=VKM1eLoN-gI][Parsing Algorithms. Lecture [0/0] Abstract Syntax Trees]]
+     - CST vs AST
+   - [[https://www.youtube.com/watch?v=eF9qWbuQLuw][Parser and Lexer — How to Create a Compiler part 1/5 — Converting text into an Abstract Syntax Tree]]
+   - https://www.youtube.com/watch?v=9-EYWLbmiG0
+     
